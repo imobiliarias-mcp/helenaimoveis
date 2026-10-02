@@ -1,7 +1,10 @@
 """Domain entities and first-class collection for property search listings."""
 
-from dataclasses import dataclass, field
-from typing import Iterator
+from collections.abc import Iterator
+from dataclasses import asdict, dataclass, field
+from urllib.parse import urlsplit
+
+from helena_research.domain.exceptions import InvalidPublicPropertyUrlError
 
 
 @dataclass(frozen=True)
@@ -43,6 +46,38 @@ class ListingSummary:
     specs: ListingSpecs
     reference_code: str | None = None
     thumbnail_url: str | None = None
+    url: str = ""
+
+    def to_dictionary(self) -> dict:
+        """Serialize listing data and its original relative URL path."""
+        property_id = self.identity.property_id
+        if not _is_public_property_url(self.url, property_id):
+            raise InvalidPublicPropertyUrlError(
+                f"Property '{property_id}' has invalid public URL '{self.url}'."
+            )
+        listing_data = asdict(self)
+        listing_data["url_path"] = self.identity.url_path
+        return listing_data
+
+
+def _is_public_property_url(url: str, property_id: str) -> bool:
+    """Check that the serialized URL is absolute and identifies this property."""
+    if not url or url != url.strip():
+        return False
+    try:
+        parsed_url = urlsplit(url)
+        port = parsed_url.port
+    except ValueError:
+        return False
+    path_segments = [segment for segment in parsed_url.path.split("/") if segment]
+    return (
+        parsed_url.scheme in {"http", "https"}
+        and bool(parsed_url.hostname)
+        and (port is None or 0 <= port <= 65535)
+        and len(path_segments) > 1
+        and path_segments[0] == "imovel"
+        and path_segments[1] == property_id
+    )
 
 
 @dataclass(frozen=True)
@@ -68,3 +103,12 @@ class ListingCollection:
     def is_empty(self) -> bool:
         """Check if collection contains no items."""
         return len(self.items) == 0
+
+    def to_dictionary(self) -> dict:
+        """Serialize listings while retaining page and pagination metadata."""
+        serialized_items = [item.to_dictionary() for item in self.items]
+        return {
+            "items": serialized_items,
+            "current_page": self.current_page,
+            "has_next_page": self.has_next_page,
+        }

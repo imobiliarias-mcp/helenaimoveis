@@ -1,7 +1,11 @@
 """Parser for extracting property listings from HTML search results."""
 
 import re
+from urllib.parse import urljoin, urlsplit
+
 from bs4 import BeautifulSoup, Tag
+
+from helena_research.domain.exceptions import InvalidPublicPropertyUrlError
 from helena_research.domain.listing import (
     ListingCollection,
     ListingIdentity,
@@ -14,11 +18,18 @@ from helena_research.domain.listing import (
 class ListingParser:
     """Parses search result pages into typed ListingCollection entities."""
 
+    def __init__(
+        self, public_base_url: str = "https://www.helenaimoveis.com.br"
+    ) -> None:
+        """Configure the public site origin used to resolve card URLs."""
+        self._public_base_url = public_base_url.rstrip("/")
+        self._validate_public_base()
+
     def parse(self, html_content: str, current_page: int = 1) -> ListingCollection:
         """Parse raw HTML and return a domain listing collection."""
         soup = BeautifulSoup(html_content, "html.parser")
         card_tags = soup.find_all("div", class_="imovelcard")
-        items = tuple(self._parse_card(t) for t in card_tags if t.get("data-link"))
+        items = tuple(self._parse_card(tag) for tag in card_tags if self._is_listing_card(tag))
         has_next = self._detect_has_next(soup)
         return ListingCollection(
             items=items, current_page=current_page, has_next_page=has_next
@@ -26,8 +37,9 @@ class ListingParser:
 
     def _parse_card(self, tag: Tag) -> ListingSummary:
         """Transform a single HTML card tag into ListingSummary."""
-        link = str(tag.get("data-link", ""))
+        link = self._extract_card_link(tag)
         prop_id = self._extract_id_from_link(link)
+        public_url = self._resolve_public_url(link, prop_id)
         identity = ListingIdentity(property_id=prop_id, url_path=link)
         title, thumb = self._extract_title_and_thumb(tag)
         location = self._extract_location(tag)
@@ -42,14 +54,66 @@ class ListingParser:
             specs=specs,
             reference_code=ref_code,
             thumbnail_url=thumb,
+            url=public_url,
         )
+
+    def _extract_card_link(self, tag: Tag) -> str:
+        """Return canonical card path or a real detail anchor href."""
+        link = str(tag.get("data-link", "")).strip()
+        if link:
+            return link
+        anchor = tag.select_one(".imovelcard__img")
+        if anchor and anchor.get("href"):
+            return str(anchor.get("href"))
+        raise InvalidPublicPropertyUrlError("Listing card has no recoverable public URL.")
 
     def _extract_id_from_link(self, link: str) -> str:
         """Extract numeric property identifier from link path."""
-        match = re.search(r"/imovel/(\d+)", link)
+        try:
+            path = urlsplit(link).path
+        except ValueError as error:
+            raise InvalidPublicPropertyUrlError(
+                f"Listing card has malformed public URL '{link}'."
+            ) from error
+        match = re.search(r"/imovel/(\d+)", path)
         if match:
             return match.group(1)
         return ""
+
+    def _is_listing_card(self, tag: Tag) -> bool:
+        """Include result cards and skip pagination-only wrappers."""
+        return bool(tag.get("data-link") or tag.find(class_="imovelcard__info"))
+
+    def _validate_public_base(self) -> None:
+        """Reject invalid public URL configuration before parsing."""
+        base = urlsplit(self._public_base_url)
+        if base.scheme not in {"http", "https"} or not base.hostname:
+            raise InvalidPublicPropertyUrlError(
+                f"Invalid public property URL base '{self._public_base_url}'."
+            )
+
+    def _resolve_public_url(self, link: str, property_id: str) -> str:
+        """Resolve and validate a property's public page URL."""
+        target = urljoin(f"{self._public_base_url}/", link)
+        parsed_target = urlsplit(target)
+        self._validate_public_target(parsed_target, property_id, link)
+        return target
+
+    def _validate_public_target(self, target, property_id: str, link: str) -> None:
+        """Reject non-web, cross-site, or non-property URL targets."""
+        host_matches = self._same_host(target.hostname)
+        segments = [part for part in target.path.split("/") if part]
+        is_property = len(segments) > 1 and segments[0] == "imovel" and segments[1].isdigit()
+        if target.scheme not in {"http", "https"} or not target.hostname or not host_matches or not is_property:
+            raise InvalidPublicPropertyUrlError(
+                f"Property '{property_id}' has invalid public URL '{link}'."
+            )
+
+    def _same_host(self, hostname: str | None) -> bool:
+        """Compare configured and destination portal hosts."""
+        base_hostname = urlsplit(self._public_base_url).hostname or ""
+        target_hostname = hostname or ""
+        return base_hostname.lower().removeprefix("www.") == target_hostname.lower().removeprefix("www.")
 
     def _extract_title_and_thumb(self, tag: Tag) -> tuple[str, str | None]:
         """Extract property title and thumbnail URL from image element."""

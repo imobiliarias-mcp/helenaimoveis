@@ -11,6 +11,7 @@ Welcome to the documentation for the **Helena Imóveis** (`helenaimoveis.com.br`
 
 - **[Research Plan & Execution Log](file:///home/samuelcaldas/repos/imobiliarias/helenaimoveis/scripts/research-plan.md)** (`scripts/research-plan.md`):  
   Detailed methodology, empirical test matrix (13 test cases verified against live portal), parameter boundary checks, and central MCP boundary specifications.
+- Search results expose an absolute public-property `url` while retaining native `url_path` and collection pagination metadata; see the API research document's search-card section.
 
 ---
 

@@ -17,5 +17,9 @@ class ParsingError(HelenaResearchError):
     """Raised when HTML or JSON response structure cannot be parsed."""
 
 
+class InvalidPublicPropertyUrlError(ParsingError, ValueError):
+    """Raised when a listing has no valid public property URL."""
+
+
 class InvalidCriteriaError(HelenaResearchError):
     """Raised when search parameters violate domain validation rules."""

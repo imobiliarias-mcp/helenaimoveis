@@ -93,3 +93,35 @@ def test_http_client_raises_connection_error_for_failed_response(
 
     with pytest.raises(PortalConnectionError, match=str(status_code)):
         HttpxHttpClient().get("https://www.helenaimoveis.com.br/search")
+
+
+def test_service_public_base_override_reaches_search_parser():
+    """Resolve result links from public base rather than search transport host."""
+    from helena_research.infrastructure.url_builder import UrlBuilder
+
+    class RecordingClient:
+        def __init__(self):
+            self.requested_urls = []
+
+        def get(self, url):
+            self.requested_urls.append(url)
+            search_html = (FIXTURES_DIR / "search_single.html").read_text(encoding="iso-8859-1")
+            return HttpResponse(200, search_html, url)
+
+    http_client = RecordingClient()
+    transport = TransportCoordinator(
+        http_client=http_client,
+        url_builder=UrlBuilder(base_url="https://search.example"),
+    )
+    service = HelenaResearchService(
+        transport=transport,
+        public_base_url="https://public.example",
+    )
+    results = service.search_rentals(SearchCriteria.create_rental(city="timoteo"))
+
+    assert len(http_client.requested_urls) == 1
+    assert http_client.requested_urls[0].startswith("https://search.example/")
+    assert results[0].url == (
+        "https://public.example/imovel/4356012/"
+        "apartamento-locacao-timoteo-mg-centro-norte"
+    )

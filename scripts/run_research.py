@@ -1,11 +1,10 @@
-from pathlib import Path
 import sys
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from helena_research.application.service import HelenaResearchService
 from helena_research.domain.criteria import SearchCriteria
-from helena_research.domain.enums import PropertyType, SortOrder
 
 
 def main() -> None:
@@ -25,6 +24,7 @@ def main() -> None:
         print(f"     Title: {item.title}")
         print(f"     Location: {item.location.neighborhood}, {item.location.city} / {item.location.state}")
         print(f"     Specs: {item.specs.bedrooms} dorm(s), {item.specs.bathrooms} bath(s), {item.specs.parking_spaces} parking")
+        print(f"     Link: {item.url}")
 
     # 2. Domain criteria query
     print("\n2. Domain Criteria Search (Timóteo, Rental, Max R$ 1.500):")
@@ -33,6 +33,7 @@ def main() -> None:
     print(f"   Returned: {len(filtered_results)} property card(s)")
     for item in filtered_results[:3]:
         print(f"   - ID: {item.identity.property_id} | Price: {item.price_text} | Bairro: {item.location.neighborhood}")
+        print(f"     Link: {item.url}")
 
     # 3. Property Detail Retrieval
     if not target_results.is_empty():

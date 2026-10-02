@@ -108,6 +108,10 @@ User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36
 </div>
 ```
 
+#### Public Property URL in Search Results
+
+The typed listing exposes an absolute `url` resolved from the original `url_path` against the configured `public_base_url` (default: `https://www.helenaimoveis.com.br`). Relative, absolute, and protocol-relative card links are supported, and identifying query parameters such as `?id=608` remain intact. When `data-link` is absent, only the property's actual detail-anchor `href` is used; no synthetic route or extra detail request is made. Non-HTTP(S), cross-host, image/search, root, and otherwise non-property destinations raise `InvalidPublicPropertyUrlError`. `ListingCollection.to_dictionary()` serializes each `url` and keeps page/pagination metadata.
+
 ---
 
 ### 3.2. Form Search Gateway (Redirect Route)

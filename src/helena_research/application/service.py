@@ -54,9 +54,12 @@ class ParserCoordinator:
         listing_parser: ListingParser | None = None,
         detail_parser: DetailParser | None = None,
         photo_parser: PhotoParser | None = None,
+        public_base_url: str | None = None,
     ) -> None:
         """Initialize parser coordinator with parsing engines."""
-        self._listing = listing_parser or ListingParser()
+        self._listing = listing_parser or ListingParser(
+            public_base_url=public_base_url or "https://www.helenaimoveis.com.br"
+        )
         self._detail = detail_parser or DetailParser()
         self._photo = photo_parser or PhotoParser()
 
@@ -80,10 +83,11 @@ class HelenaResearchService:
         self,
         transport: TransportCoordinator | None = None,
         parsers: ParserCoordinator | None = None,
+        public_base_url: str | None = None,
     ) -> None:
         """Initialize service with coordinators complying with 2-field rule."""
         self._transport = transport or TransportCoordinator()
-        self._parsers = parsers or ParserCoordinator()
+        self._parsers = parsers or ParserCoordinator(public_base_url=public_base_url)
 
     def search_rentals(self, criteria: SearchCriteria) -> ListingCollection:
         """Execute rental search according to domain specification."""
