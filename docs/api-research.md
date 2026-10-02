@@ -45,6 +45,7 @@ sequenceDiagram
 3. **Authentication Status**: **Completely Unauthenticated**. All search, filter, pagination, detail, and photo gallery endpoints are publicly accessible without authentication tokens, cookies, or CSRF tokens.
 4. **Dual Photo Retrieval Channels**: Property photos are available both through the `#galeria-inicial` container in the detail HTML and via a lightweight JSON endpoint at `/t27/lista_imoveis_fotos.php?imovel={id}`.
 5. **LLM/Agentic Support**: The site provides an `/llms.txt` document describing the agency context, CRECI registration (F0013267), and operational scope.
+6. **HTTP Status Errors**: The client follows redirects and raises `PortalConnectionError` for all 4xx/5xx responses, including 404, so failed searches are never parsed as empty results. Nonexistent property IDs are documented to redirect to the homepage and become `PropertyNotFoundError`.
 
 ---
 

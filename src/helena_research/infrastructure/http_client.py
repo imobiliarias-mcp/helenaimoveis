@@ -2,7 +2,9 @@
 
 from dataclasses import dataclass
 from typing import Protocol
+
 import httpx
+
 from helena_research.domain.exceptions import PortalConnectionError
 
 
@@ -49,6 +51,7 @@ class HttpxHttpClient:
             headers=self._headers, timeout=self._timeout, follow_redirects=True
         ) as client:
             resp = client.get(url)
+            resp.raise_for_status()
             return HttpResponse(
                 status_code=resp.status_code,
                 text=resp.text,
