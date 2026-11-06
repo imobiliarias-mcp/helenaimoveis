@@ -3,6 +3,8 @@
 from typing import Any
 from helena_research.application.service import HelenaResearchService
 from helena_research.domain.criteria import SearchCriteria
+from helena_research.domain.listing import ListingSummary
+from helena_research.domain.property import PropertyDetail
 
 
 class HelenaMcpAdapter:
@@ -51,47 +53,40 @@ class HelenaMcpAdapter:
             "listings": [self._format_item(item) for item in collection],
         }
 
-    def _format_item(self, item: Any) -> dict[str, Any]:
-        """Format individual listing item."""
-        pid = getattr(item.property_id, "value", str(item.property_id))
-        loc = getattr(item, "location", None)
-        neigh = getattr(loc.neighborhood, "value", str(loc.neighborhood)) if loc else ""
-        c = getattr(loc.city, "value", str(loc.city)) if loc else ""
-        specs = getattr(item, "specs", None)
-        beds = getattr(specs.bedrooms, "value", specs.bedrooms) if specs and specs.bedrooms else 0
-        baths = getattr(specs.bathrooms, "value", specs.bathrooms) if specs and specs.bathrooms else 0
-        url = getattr(item.url, "value", str(item.url)) if hasattr(item, "url") else ""
+    def _format_item(self, item: ListingSummary) -> dict[str, Any]:
+        """Format a ListingSummary into the standard listing dictionary."""
         return {
-            "id": str(pid),
-            "title": getattr(item, "title", ""),
-            "price": getattr(item, "price_formatted", ""),
-            "bedrooms": int(beds) if str(beds).isdigit() else 0,
-            "bathrooms": int(baths) if str(baths).isdigit() else 0,
-            "neighborhood": neigh,
-            "city": c,
-            "url": url,
+            "id": item.identity.property_id,
+            "title": item.title,
+            "price": item.price_text,
+            "bedrooms": item.specs.bedrooms or 0,
+            "bathrooms": item.specs.bathrooms or 0,
+            "neighborhood": item.location.neighborhood,
+            "city": item.location.city,
+            "url": item.url,
+            "media_url": item.thumbnail_url or "",
         }
 
     def get_property_detail(self, property_code: str) -> dict[str, Any]:
         """Retrieve complete property detail for an MCP tool call."""
-        detail = self._service.get_property_detail(property_code)
-        loc = getattr(detail, "location", None)
-        specs = getattr(detail, "specs", None)
-        gallery = getattr(detail, "gallery", None)
-        photos = getattr(gallery, "urls", []) if gallery else []
-        beds = getattr(specs.bedrooms, "value", specs.bedrooms) if specs and specs.bedrooms else 0
-        baths = getattr(specs.bathrooms, "value", specs.bathrooms) if specs and specs.bathrooms else 0
+        detail: PropertyDetail = self._service.get_property_detail(property_code)
+        overview = detail.overview
+        pricing = detail.pricing
+        location = detail.location
+        specs = detail.specs
         return {
             "id": str(property_code),
-            "title": getattr(detail.title, "value", str(detail.title)),
-            "description": getattr(detail.description, "value", str(detail.description)),
-            "price": getattr(detail, "price_formatted", ""),
-            "bedrooms": int(beds) if str(beds).isdigit() else 0,
-            "bathrooms": int(baths) if str(baths).isdigit() else 0,
-            "neighborhood": getattr(loc.neighborhood, "value", str(loc.neighborhood)) if loc else "",
-            "city": getattr(loc.city, "value", str(loc.city)) if loc else "",
-            "url": getattr(detail.url, "value", str(detail.url)) if hasattr(detail, "url") else "",
-            "photos": list(photos),
+            "title": overview.title,
+            "description": overview.description,
+            "price": pricing.formatted_text,
+            "condo_fee": pricing.condo_fee,
+            "iptu": pricing.iptu,
+            "bedrooms": specs.bedrooms or 0,
+            "bathrooms": specs.bathrooms or 0,
+            "neighborhood": location.neighborhood,
+            "city": location.city,
+            "url": detail.canonical_url,
+            "photos": list(detail.photos.photo_urls),
         }
 
     def get_facets(self) -> dict[str, Any]:
